@@ -1,0 +1,80 @@
+#! /usr/bin/env python3
+
+import cv2
+import numpy as np
+import cv2
+import threading
+import base64
+from ProducerConsumerQueue import ProducerConsumerQueue
+
+def extractFrames(fName, queue, maxFrames = 9999):
+
+    frameCount = 0
+    videoCapture = cv2.VideoCapture(fName)
+
+    read, image = videoCapture.read()
+
+    print(f'Frame number {frameCount} {read}')
+    while(read and frameCount < maxFrames):
+        read, singleImage = cv2.imencode('.jpg', image)
+
+        encodedImage = base64.b64encode(singleImage)
+
+        queue.add(image)
+
+        read, image = videoCapture.read()
+        print(f'Reading frame {frameCount} {read}')
+        frameCount += 1
+    # None signals that all frames have been read, and to stop inserting to queue.
+    queue.add(None)
+    os.write(1, "A single frame has been extracted".encode())
+
+def grayFrames(readFromQueue, writeToQueue):
+    frameCount = 0
+    normalFrame = readFromQueue.delete()
+
+    while(normalFrame is not None):
+        monoFrame = cv2.cvtColor(normalFrame, cv2.COLOR_BGR2GRAY)
+
+        print("Currently Decoloring frame "+str(frameCount))
+        writeToQueue.add(monoFrame)
+
+        frameCount += 1
+
+        normalFrame = readFromQueue.delete()
+    # None signals that all frames have been decolored, and to stop inserting into the queue.
+    os.write(1, "All frames are decolored :(".encode())
+    writeToQueue.add(None)
+
+def display(frameQueue):
+
+    frameCount = 0
+    singleFrame = frameQueue.delete()
+
+    while(singleFrame is not None):
+
+        pritn("Currently showing frame "+str(singleFrame))
+
+        cv2.imshow("Video", singleFrame)
+
+        if(cv2.waitKey(42) and 0xFF == ord("q")):
+            break
+
+        frameCount += 1
+        singleFrame = frameQueue.delete()
+
+    os.write(1, "Video Finished".encode())
+    cv2.destroyAllWindows()
+
+video = 'clip.mp4'
+
+pQForGrayVid = ProducerConsumerQueue()
+cQForGrayVid = ProducerConsumerQueue()
+
+producerForVid = threading.Thread(target = extractFrames, args = [video, pQForGrayVid, 1000])
+grayFrameForVid = threading.Thread(target = grayFrames, args = [pQForGrayVid, cQForGrayVid])
+consumerForVid = threading.Thread(target = display, args = [cQForGrayVid])
+
+producerForVid.start()
+grayFrameForVid.start()
+consumerForVid.start()
