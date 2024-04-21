@@ -14,6 +14,9 @@ class ProducerConsumerQueue:
         self.vacantCells = threading.Semaphore(self.queueLength)
         self.occupiedCells = threading.Semaphore(0)
 
+    # Adds a frame to a queue only if the frame is not full
+    # Locks are acquired and released, and frames are added to
+    # the queue; ensures no race conditions between threads.
     def add(self, frame):
         self.vacantCells.acquire()
         self.Lock.acquire()
@@ -21,6 +24,10 @@ class ProducerConsumerQueue:
         self.Lock.release()
         self.occupiedCells.release()
 
+    # Deletes a frame from a queue and returns that frame;
+    # my own version of pop.  Locks are acquired and released,
+    # and frames are deleted from the queue in between; ensures
+    # no race conditions between threads.
     def delete(self):
         self.occupiedCells.acquire()
         self.Lock.acquire()
